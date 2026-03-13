@@ -10,6 +10,9 @@ authors = [
 # PEP 621 project metadata
 # See https://www.python.org/dev/peps/pep-0621/
 dependencies = [
+  "arro3-core>=0.8.0",
+  "dash>=4.0.0",
+  "dash-ag-grid>=33.3.3",
   "django-environ",
   "fsspec>=2026.2.0",
   "hydra-core>=1.3.2",

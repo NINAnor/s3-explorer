@@ -1,0 +1,8 @@
+debug: true
+
+buckets:
+  robinradar-flex:
+    endpoint: https://s3-int-1.nina.no
+
+  robinradar-microshelter:
+    endpoint: https://s3-int-1.nina.no

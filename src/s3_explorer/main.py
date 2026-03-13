@@ -35,13 +35,11 @@ def configure_logger(logging_level=logging.NOTSET):
     config_name="config",
 )
 def start(cfg) -> None:
-    logger = configure_logger(
-        logging.DEBUG if "debug" in cfg and cfg.debug else logging.INFO
-    )
+    debug = "debug" in cfg and cfg.debug
+    logger = configure_logger(logging.DEBUG if debug else logging.INFO)
     logger.debug("Configuration", config=cfg)
-
     app = create_app(cfg, logger)
-    app.run()
+    app.run(debug=debug)
 
 
 if __name__ == "__main__":
