@@ -1,0 +1,6 @@
+debug: true
+
+buckets:
+  bucket-id:
+    endpoint: http://custom-s3.com
+    bucket: bucket
