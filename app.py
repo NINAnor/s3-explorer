@@ -1,12 +1,17 @@
 import pathlib
 
+import folium
+import geoarrow.pyarrow as ga
 import humanize
 import ibis
+import obstore.fsspec
 import pyarrow as pa
 import pyarrow.parquet as pq
 import streamlit as st
+from geoarrow.pyarrow.io import read_geoparquet_table
 from obstore.store import S3Store
 from omegaconf import OmegaConf
+from streamlit_folium import st_folium
 
 
 def load_config():
@@ -35,6 +40,21 @@ def create_store(
         bucket=bucket_name,
         config=config,
     )
+
+
+def create_fs(
+    bucket_name: str, endpoint: str, access_key: str | None, secret_key: str | None
+) -> obstore.fsspec.FsspecStore:
+    """Create an fsspec filesystem for the given bucket."""
+    config = {
+        "endpoint": endpoint,
+    }
+    if access_key:
+        config["access_key_id"] = access_key
+        config["secret_access_key"] = secret_key
+    else:
+        config["skip_signature"] = True
+    return obstore.fsspec.FsspecStore("s3", **config)
 
 
 @st.cache_data
@@ -86,24 +106,83 @@ def preview_file(bucket_cfg, bucket_name: str, path: str):
     ext = pathlib.Path(path).suffix.lower()
 
     try:
-        content = load_file_content(
-            bucket_name,
-            bucket_cfg.endpoint,
-            bucket_cfg.get("access_key"),
-            bucket_cfg.get("secret_key"),
-            path,
-        )
-
         if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"):
+            content = load_file_content(
+                bucket_cfg.bucket or bucket_name,
+                bucket_cfg.endpoint,
+                bucket_cfg.get("access_key"),
+                bucket_cfg.get("secret_key"),
+                path,
+            )
             st.image(content, caption=path)
         elif ext == ".parquet":
-            table = pq.read_table(pa.BufferReader(content))
-            st.info(f"{table.num_rows} rows, {table.num_columns} columns")
-            st.dataframe(table, width="stretch", height=400)
+            # Use obstore fsspec filesystem
+            fs = create_fs(
+                bucket_cfg.bucket or bucket_name,
+                bucket_cfg.endpoint,
+                bucket_cfg.get("access_key"),
+                bucket_cfg.get("secret_key"),
+            )
+
+            full_path = f"s3://{bucket_name}/{path}"
+
+            # Try to read as geoparquet
+            try:
+                with fs.open(full_path, "rb") as f:
+                    gdf = ga.to_geopandas(read_geoparquet_table(f)).head(2000)
+
+                # Get bounds for initial view
+                bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
+                center_lat = (bounds[1] + bounds[3]) / 2
+                center_lon = (bounds[0] + bounds[2]) / 2
+
+                # Create folium map
+                m = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+
+                # Add only geometry to map (ignore other fields)
+                geom_only = gdf[[gdf.geometry.name]]
+                folium.GeoJson(
+                    geom_only.to_json(),
+                    style_function=lambda x: {
+                        "fillColor": "#0064c8",
+                        "color": "#000000",
+                        "weight": 1,
+                        "fillOpacity": 0.4,
+                    },
+                ).add_to(m)
+
+                # Fit bounds
+                m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
+
+                st.dataframe(gdf, width="stretch", height=400)
+                try:
+                    st_folium(m, use_container_width=True, height=400)
+                except Exception as e:
+                    st.warning(f"Could not render map preview: {e}")
+            except Exception as e:
+                with fs.open(full_path, "rb") as f:
+                    table = pq.read_table(f)
+                st.warning(f"Could not render as geospatial data: {e}")
+                st.dataframe(table, width="stretch", height=400)
+
         elif ext in (".txt", ".md", ".json", ".yaml", ".yml", ".csv", ".xml"):
+            content = load_file_content(
+                bucket_cfg.bucket or bucket_name,
+                bucket_cfg.endpoint,
+                bucket_cfg.get("access_key"),
+                bucket_cfg.get("secret_key"),
+                path,
+            )
             st.code(content.decode("utf-8"), language=ext.lstrip("."))
         else:
             st.warning(f"No preview available for {ext} files")
+            content = load_file_content(
+                bucket_cfg.bucket or bucket_name,
+                bucket_cfg.endpoint,
+                bucket_cfg.get("access_key"),
+                bucket_cfg.get("secret_key"),
+                path,
+            )
             st.download_button(
                 "Download file", content, file_name=pathlib.Path(path).name
             )
@@ -130,18 +209,30 @@ def run_app():
         index=0,
     )
 
+    # Path search in sidebar
+    path_search = st.sidebar.text_input("Search path", placeholder="Filter by path...")
+
     if selected_bucket:
         bucket_cfg = cfg.buckets[selected_bucket]
 
         with st.spinner("Loading bucket contents..."):
             table = load_bucket_contents(
-                selected_bucket,
+                bucket_cfg.bucket or selected_bucket,
                 bucket_cfg.endpoint,
                 bucket_cfg.get("access_key"),
                 bucket_cfg.get("secret_key"),
             )
 
             if table:
+                # Filter by path search
+                if path_search:
+                    path_col = table.column("path")
+                    mask = [
+                        path_search.lower() in (p.as_py() or "").lower()
+                        for p in path_col
+                    ]
+                    table = table.filter(pa.array(mask))
+
                 st.info(f"{table.num_rows} items found")
 
                 event = st.dataframe(
@@ -158,9 +249,13 @@ def run_app():
                     selected_path = table.column("path")[selected_idx].as_py()
 
                     st.subheader(
-                        f"Preview: {bucket_cfg.endpoint}/{selected_bucket}/{selected_path}"
+                        f"Preview: {bucket_cfg.endpoint}/{bucket_cfg.bucket or selected_bucket}/{selected_path}"
                     )
-                    preview_file(bucket_cfg, selected_bucket, selected_path)
+                    preview_file(
+                        bucket_cfg,
+                        bucket_cfg.bucket or bucket_cfg.bucket or selected_bucket,
+                        selected_path,
+                    )
             else:
                 st.info("Bucket is empty")
 
