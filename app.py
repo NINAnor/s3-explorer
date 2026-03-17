@@ -1,9 +1,9 @@
 import pathlib
 
-import folium
 import geoarrow.pyarrow as ga
 import humanize
 import ibis
+import leafmap.foliumap as leafmap
 import obstore.fsspec
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -11,7 +11,6 @@ import streamlit as st
 from geoarrow.pyarrow.io import read_geoparquet_table
 from obstore.store import S3Store
 from omegaconf import OmegaConf
-from streamlit_folium import st_folium
 
 
 def load_config():
@@ -115,6 +114,13 @@ def preview_file(bucket_cfg, bucket_name: str, path: str):
                 path,
             )
             st.image(content, caption=path)
+
+        elif ext == ".tif":
+            full_path = f"{bucket_cfg.endpoint}/{bucket_cfg.bucket}/{path}"
+            m = leafmap.Map()
+            m.add_cog_layer(full_path, palette="viridis", name="Remote COG")
+            m.to_streamlit()
+
         elif ext == ".parquet":
             # Use obstore fsspec filesystem
             fs = create_fs(
@@ -131,32 +137,13 @@ def preview_file(bucket_cfg, bucket_name: str, path: str):
                 with fs.open(full_path, "rb") as f:
                     gdf = ga.to_geopandas(read_geoparquet_table(f)).head(2000)
 
-                # Get bounds for initial view
-                bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
-                center_lat = (bounds[1] + bounds[3]) / 2
-                center_lon = (bounds[0] + bounds[2]) / 2
-
-                # Create folium map
-                m = folium.Map(location=[center_lat, center_lon], zoom_start=10)
-
-                # Add only geometry to map (ignore other fields)
+                st.warning("Only the first 2000 elements are previewed")
+                m = leafmap.Map()
                 geom_only = gdf[[gdf.geometry.name]]
-                folium.GeoJson(
-                    geom_only.to_json(),
-                    style_function=lambda x: {
-                        "fillColor": "#0064c8",
-                        "color": "#000000",
-                        "weight": 1,
-                        "fillOpacity": 0.4,
-                    },
-                ).add_to(m)
-
-                # Fit bounds
-                m.fit_bounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]])
-
+                m.add_gdf(geom_only, layer_name="Geometries")
                 st.dataframe(gdf, width="stretch", height=400)
                 try:
-                    st_folium(m, use_container_width=True, height=400)
+                    m.to_streamlit()
                 except Exception as e:
                     st.warning(f"Could not render map preview: {e}")
             except Exception as e:
