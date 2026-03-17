@@ -14,7 +14,6 @@ jobs:
       matrix:
         include:
           - context: .
-            target: django
             image: ghcr.io/ninanor/s3-explorer
 
     permissions:
