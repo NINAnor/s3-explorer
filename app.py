@@ -1,3 +1,4 @@
+import os
 import pathlib
 
 import geoarrow.pyarrow as ga
@@ -14,8 +15,10 @@ from omegaconf import OmegaConf
 
 
 def load_config():
-    """Load configuration from config.yaml."""
-    config_path = pathlib.Path.cwd() / "config.yaml"
+    """Load configuration from config.yaml or path specified by S3_EXPLORER_CONFIG env var."""
+    config_path = pathlib.Path(
+        os.environ.get("S3_EXPLORER_CONFIG", pathlib.Path.cwd() / "config.yaml")
+    )
     if config_path.exists():
         return OmegaConf.load(config_path)
     return OmegaConf.create({"buckets": {}})
@@ -56,7 +59,7 @@ def create_fs(
     return obstore.fsspec.FsspecStore("s3", **config)
 
 
-@st.cache_data
+@st.cache_data()
 def load_bucket_contents(
     bucket_name: str, endpoint: str, access_key: str | None, secret_key: str | None
 ) -> pa.Table | None:
@@ -201,6 +204,15 @@ def run_app():
 
     if selected_bucket:
         bucket_cfg = cfg.buckets[selected_bucket]
+
+        # Clear cache button for selected bucket
+        if st.sidebar.button("Refresh bucket"):
+            load_bucket_contents.clear(
+                bucket_cfg.bucket or selected_bucket,
+                bucket_cfg.endpoint,
+                bucket_cfg.get("access_key"),
+                bucket_cfg.get("secret_key"),
+            )
 
         with st.spinner("Loading bucket contents..."):
             table = load_bucket_contents(
