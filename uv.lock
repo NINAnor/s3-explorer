@@ -2871,7 +2871,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "arro3-core" },
     { name = "django-environ" },
-    { name = "duckdb" },
     { name = "fsspec" },
     { name = "geoarrow-pyarrow" },
     { name = "geopandas" },
@@ -2880,10 +2879,7 @@ dependencies = [
     { name = "leafmap" },
     { name = "obstore" },
     { name = "omegaconf" },
-    { name = "plotly" },
-    { name = "pydeck" },
     { name = "streamlit" },
-    { name = "streamlit-folium" },
 ]
 
 [package.dev-dependencies]
@@ -2896,7 +2892,6 @@ dev = [
 requires-dist = [
     { name = "arro3-core", specifier = ">=0.8.0" },
     { name = "django-environ" },
-    { name = "duckdb", specifier = "==1.5.0" },
     { name = "fsspec", specifier = ">=2026.2.0" },
     { name = "geoarrow-pyarrow", specifier = ">=0.2.0" },
     { name = "geopandas", specifier = ">=1.1.3" },
@@ -2905,10 +2900,7 @@ requires-dist = [
     { name = "leafmap", specifier = ">=0.60.4" },
     { name = "obstore", specifier = ">=0.9.2" },
     { name = "omegaconf", specifier = ">=2.3.0" },
-    { name = "plotly", specifier = ">=6.6.0" },
-    { name = "pydeck", specifier = ">=0.9.1" },
     { name = "streamlit", specifier = ">=1.30.0" },
-    { name = "streamlit-folium", specifier = ">=0.26.2" },
 ]
 
 [package.metadata.requires-dev]
@@ -3072,21 +3064,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/92/8e/f2b8b4fa8ba65aae251170c54f8ce198fb588fc348301c2b624f8c63efac/streamlit-1.55.0.tar.gz", hash = "sha256:015e512bbd02d000f4047e51118dc086b70e7d9c46b4a11a33c2509731379626", size = 8612008 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/dc/e6/412c1e1f200ca8c32ecf10201839183e261ad61ced3ede34a66f6d4be3cf/streamlit-1.55.0-py3-none-any.whl", hash = "sha256:1e4a16449c6131696180f4ddb40ea8c51834e89c2a43e1b0362bc9b1cfd9b415", size = 9075714 },
-]
-
-[[package]]
-name = "streamlit-folium"
-version = "0.26.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "branca" },
-    { name = "folium" },
-    { name = "jinja2" },
-    { name = "streamlit" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/47/973d822f41dec182c3b03b2c418bffc831e861d6872a4637f79ccd95c754/streamlit_folium-0.26.2.tar.gz", hash = "sha256:721e712d6edddd0a87e65d7378ba38e467014f3f042b16ca170302c07169c351", size = 521771 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/6f/0ca25c31f3d7e2faa25def363438c81e789622e1365b38be9ccd8dc11055/streamlit_folium-0.26.2-py3-none-any.whl", hash = "sha256:6374a932e7d94806af122b89982c805ab0641a17a350d160cf74a96d5b8300c1", size = 523736 },
 ]
 
 [[package]]
