@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+.vscode
+outputs
+__pycache__
+*.pyc
+*.pyo
+.env
+config.yaml
+.copier-answers.yml
+.pre-commit-config.yaml
+.editorconfig
+.pinact.yaml
