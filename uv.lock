@@ -2879,6 +2879,7 @@ dependencies = [
     { name = "leafmap" },
     { name = "obstore" },
     { name = "omegaconf" },
+    { name = "pyarrow" },
     { name = "streamlit" },
 ]
 
@@ -2900,6 +2901,7 @@ requires-dist = [
     { name = "leafmap", specifier = ">=0.60.4" },
     { name = "obstore", specifier = ">=0.9.2" },
     { name = "omegaconf", specifier = ">=2.3.0" },
+    { name = "pyarrow", specifier = ">=15.0.0" },
     { name = "streamlit", specifier = ">=1.30.0" },
 ]
 

@@ -15,7 +15,7 @@ from omegaconf import OmegaConf
 
 
 def load_config():
-    """Load configuration from config.yaml or path specified by S3_EXPLORER_CONFIG env var."""
+    """Load config from config.yaml or S3_EXPLORER_CONFIG env var."""
     config_path = pathlib.Path(
         os.environ.get("S3_EXPLORER_CONFIG", pathlib.Path.cwd() / "config.yaml")
     )
@@ -248,7 +248,8 @@ def run_app():
                     selected_path = table.column("path")[selected_idx].as_py()
 
                     st.subheader(
-                        f"Preview: {bucket_cfg.endpoint}/{bucket_cfg.bucket or selected_bucket}/{selected_path}"
+                        f"Preview: {bucket_cfg.endpoint}/"
+                        f"{bucket_cfg.bucket or selected_bucket}/{selected_path}"
                     )
                     preview_file(
                         bucket_cfg,
