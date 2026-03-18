@@ -55,11 +55,6 @@ repos:
       - id: ruff
       - id: ruff-format
 
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.8.8
-    hooks:
-      - id: uv-lock
-
   - repo: local
     hooks:
       - id: deptry

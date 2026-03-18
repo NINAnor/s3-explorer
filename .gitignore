@@ -178,3 +178,6 @@ pyrightconfig.json
 outputs
 
 config.yaml
+# pixi environments
+.pixi/*
+!.pixi/config.toml

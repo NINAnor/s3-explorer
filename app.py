@@ -12,6 +12,7 @@ import streamlit as st
 from geoarrow.pyarrow.io import read_geoparquet_table
 from obstore.store import S3Store
 from omegaconf import OmegaConf
+from pyogrio import read_info
 
 
 def load_config():
@@ -107,6 +108,16 @@ def preview_file(bucket_cfg, bucket_name: str, path: str):
     """Preview file content based on extension."""
     ext = pathlib.Path(path).suffix.lower()
 
+    http_path = f"{bucket_cfg.endpoint}/{bucket_cfg.bucket}/{path}"
+    fs = create_fs(
+        bucket_cfg.bucket or bucket_name,
+        bucket_cfg.endpoint,
+        bucket_cfg.get("access_key"),
+        bucket_cfg.get("secret_key"),
+    )
+
+    s3_path = f"s3://{bucket_name}/{path}"
+
     try:
         if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"):
             content = load_file_content(
@@ -119,40 +130,41 @@ def preview_file(bucket_cfg, bucket_name: str, path: str):
             st.image(content, caption=path)
 
         elif ext == ".tif":
-            full_path = f"{bucket_cfg.endpoint}/{bucket_cfg.bucket}/{path}"
             m = leafmap.Map()
-            m.add_cog_layer(full_path, palette="viridis", name="Remote COG")
+            m.add_cog_layer(http_path, palette="viridis", name="Remote COG")
             m.to_streamlit()
 
         elif ext == ".parquet":
-            # Use obstore fsspec filesystem
-            fs = create_fs(
-                bucket_cfg.bucket or bucket_name,
-                bucket_cfg.endpoint,
-                bucket_cfg.get("access_key"),
-                bucket_cfg.get("secret_key"),
-            )
-
-            full_path = f"s3://{bucket_name}/{path}"
-
-            # Try to read as geoparquet
+            info = None
+            # Read and display metadata using fiona
             try:
-                with fs.open(full_path, "rb") as f:
-                    gdf = ga.to_geopandas(read_geoparquet_table(f)).head(2000)
+                info = read_info(http_path)
+            except Exception as meta_err:
+                st.info(f"Could not read metadata with PyOGRIO: {meta_err}")
 
-                st.warning("Only the first 2000 elements are previewed")
-                m = leafmap.Map()
-                geom_only = gdf[[gdf.geometry.name]]
-                m.add_gdf(geom_only, layer_name="Geometries")
-                st.dataframe(gdf, width="stretch", height=400)
+            if info:
+                with st.expander("Show file metadata (PyOGRIO)"):
+                    st.json(info)
+
+            if info["crs"]:
                 try:
-                    m.to_streamlit()
+                    with fs.open(s3_path, "rb") as f:
+                        gdf = ga.to_geopandas(read_geoparquet_table(f)).head(2000)
+
+                    st.warning("Only the first 2000 elements are previewed")
+                    m = leafmap.Map()
+                    geom_only = gdf[[gdf.geometry.name]]
+                    m.add_gdf(geom_only, layer_name="Geometries")
+                    st.dataframe(gdf, width="stretch", height=400)
+                    try:
+                        m.to_streamlit()
+                    except Exception as e:
+                        st.warning(f"Could not render map preview: {e}")
                 except Exception as e:
-                    st.warning(f"Could not render map preview: {e}")
-            except Exception as e:
-                with fs.open(full_path, "rb") as f:
+                    st.warning(f"Could not render as geospatial data: {e}")
+            else:
+                with fs.open(s3_path, "rb") as f:
                     table = pq.read_table(f)
-                st.warning(f"Could not render as geospatial data: {e}")
                 st.dataframe(table, width="stretch", height=400)
 
         elif ext in (".txt", ".md", ".json", ".yaml", ".yml", ".csv", ".xml"):

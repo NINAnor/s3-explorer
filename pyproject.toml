@@ -22,6 +22,7 @@ dependencies = [
   "obstore>=0.9.2",
   "omegaconf>=2.3.0",
   "pyarrow>=15.0.0",
+  "pyogrio>=0.12.1",
   "streamlit>=1.30.0"
 ]
 description = ""
@@ -35,6 +36,23 @@ version = "0.1.0"
 
 [tool.deptry]
 ignore = ["DEP002", "DEP003"]
+
+[tool.pixi.dependencies]
+libgdal-arrow-parquet = ">=3.12.2,<4"
+pyogrio = ">=0.12.1,<0.13"
+
+[tool.pixi.environments]
+default = {solve-group = "default"}
+dev = {features = ["dev"], solve-group = "default"}
+
+[tool.pixi.pypi-dependencies]
+s3-explorer = {path = ".", editable = true}
+
+[tool.pixi.tasks]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
 
 [tool.ruff]
 fix = true

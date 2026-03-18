@@ -17,10 +17,10 @@ A Streamlit-based web application for exploring S3-compatible storage buckets an
 
 ## Setup
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
+Install [pixi](https://pixi.sh/latest/#installation), then:
 
 ```bash
-uv sync
+pixi install
 ```
 
 ## Configuration
@@ -51,7 +51,7 @@ export S3_EXPLORER_CONFIG=/path/to/config.yaml
 ## Run
 
 ```bash
-uv run streamlit run app.py
+pixi run streamlit run app.py
 ```
 
 Then open http://localhost:8501 in your browser.
