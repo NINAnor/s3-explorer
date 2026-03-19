@@ -1,20 +1,19 @@
 import os
 import pathlib
 
-import geoarrow.pyarrow as ga
+import duckdb
+import geoarrow.pyarrow as ga  # noqa: F401
 import humanize
 import ibis
 import leafmap.foliumap as leafmap
-import obstore.fsspec
 import pyarrow as pa
-import pyarrow.parquet as pq
 import streamlit as st
-from geoarrow.pyarrow.io import read_geoparquet_table
 from obstore.store import S3Store
 from omegaconf import OmegaConf
 from pyogrio import read_info
 
 
+@st.cache_data
 def load_config():
     """Load config from config.yaml or S3_EXPLORER_CONFIG env var."""
     config_path = pathlib.Path(
@@ -25,6 +24,7 @@ def load_config():
     return OmegaConf.create({"buckets": {}})
 
 
+@st.cache_resource
 def create_store(
     bucket_name: str, endpoint: str, access_key: str | None, secret_key: str | None
 ) -> S3Store:
@@ -45,22 +45,7 @@ def create_store(
     )
 
 
-def create_fs(
-    bucket_name: str, endpoint: str, access_key: str | None, secret_key: str | None
-) -> obstore.fsspec.FsspecStore:
-    """Create an fsspec filesystem for the given bucket."""
-    config = {
-        "endpoint": endpoint,
-    }
-    if access_key:
-        config["access_key_id"] = access_key
-        config["secret_access_key"] = secret_key
-    else:
-        config["skip_signature"] = True
-    return obstore.fsspec.FsspecStore("s3", **config)
-
-
-@st.cache_data()
+@st.cache_data
 def load_bucket_contents(
     bucket_name: str, endpoint: str, access_key: str | None, secret_key: str | None
 ) -> pa.Table | None:
@@ -91,7 +76,7 @@ def load_bucket_contents(
     return None
 
 
-@st.cache_resource
+@st.cache_data
 def load_file_content(
     bucket_name: str,
     endpoint: str,
@@ -109,14 +94,6 @@ def preview_file(bucket_cfg, bucket_name: str, path: str):
     ext = pathlib.Path(path).suffix.lower()
 
     http_path = f"{bucket_cfg.endpoint}/{bucket_cfg.bucket}/{path}"
-    fs = create_fs(
-        bucket_cfg.bucket or bucket_name,
-        bucket_cfg.endpoint,
-        bucket_cfg.get("access_key"),
-        bucket_cfg.get("secret_key"),
-    )
-
-    s3_path = f"s3://{bucket_name}/{path}"
 
     try:
         if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"):
@@ -146,16 +123,18 @@ def preview_file(bucket_cfg, bucket_name: str, path: str):
                 with st.expander("Show file metadata (PyOGRIO)"):
                     st.json(info)
 
+            con = duckdb.connect()
+            con.execute("set memory_limit = '1GB'")
+            df = con.read_parquet(http_path).limit(2000)
+
             if info["crs"]:
                 try:
-                    with fs.open(s3_path, "rb") as f:
-                        gdf = ga.to_geopandas(read_geoparquet_table(f)).head(2000)
-
+                    df = ga.to_geopandas(df.arrow())
                     st.warning("Only the first 2000 elements are previewed")
                     m = leafmap.Map()
-                    geom_only = gdf[[gdf.geometry.name]]
+                    geom_only = df[[df.geometry.name]]
                     m.add_gdf(geom_only, layer_name="Geometries")
-                    st.dataframe(gdf, width="stretch", height=400)
+                    st.dataframe(df, width="stretch", height=400)
                     try:
                         m.to_streamlit()
                     except Exception as e:
@@ -163,9 +142,8 @@ def preview_file(bucket_cfg, bucket_name: str, path: str):
                 except Exception as e:
                     st.warning(f"Could not render as geospatial data: {e}")
             else:
-                with fs.open(s3_path, "rb") as f:
-                    table = pq.read_table(f)
-                st.dataframe(table, width="stretch", height=400)
+                st.dataframe(df, width="stretch", height=400)
+            con.close()
 
         elif ext in (".txt", ".md", ".json", ".yaml", ".yml", ".csv", ".xml"):
             content = load_file_content(
